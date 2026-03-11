@@ -13,7 +13,10 @@ import { nanoid } from "nanoid";
 import { names, type ChatMessage, type Message } from "../shared";
 
 function App() {
-	const [name] = useState(names[Math.floor(Math.random() * names.length)]);
+	const [name, setName] = useState<string | null>(() => {
+		return localStorage.getItem("chat-name");
+	});
+
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const { room } = useParams();
 
@@ -22,10 +25,11 @@ function App() {
 		room,
 		onMessage: (evt) => {
 			const message = JSON.parse(evt.data as string) as Message;
+
 			if (message.type === "add") {
 				const foundIndex = messages.findIndex((m) => m.id === message.id);
+
 				if (foundIndex === -1) {
-					// probably someone else who added a message
 					setMessages((messages) => [
 						...messages,
 						{
@@ -36,9 +40,6 @@ function App() {
 						},
 					]);
 				} else {
-					// this usually means we ourselves added a message
-					// and it was broadcasted back
-					// so let's replace the message with the new message
 					setMessages((messages) => {
 						return messages
 							.slice(0, foundIndex)
@@ -70,6 +71,43 @@ function App() {
 		},
 	});
 
+	/* ---------------- NAME FORM ---------------- */
+
+	if (!name) {
+		return (
+			<div className="container">
+				<h4>Enter your name</h4>
+
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						const input = e.currentTarget.elements.namedItem(
+							"username",
+						) as HTMLInputElement;
+
+						const chosenName =
+							input.value ||
+							names[Math.floor(Math.random() * names.length)];
+
+						localStorage.setItem("chat-name", chosenName);
+						setName(chosenName);
+					}}
+				>
+					<input
+						type="text"
+						name="username"
+						placeholder="Your name..."
+						required
+					/>
+
+					<button type="submit">Join Chat</button>
+				</form>
+			</div>
+		);
+	}
+
+	/* ---------------- CHAT UI ---------------- */
+
 	return (
 		<div className="chat container">
 			{messages.map((message) => (
@@ -78,21 +116,24 @@ function App() {
 					<div className="ten columns">{message.content}</div>
 				</div>
 			))}
+
 			<form
 				className="row"
 				onSubmit={(e) => {
 					e.preventDefault();
+
 					const content = e.currentTarget.elements.namedItem(
 						"content",
 					) as HTMLInputElement;
+
 					const chatMessage: ChatMessage = {
 						id: nanoid(8),
 						content: content.value,
 						user: name,
 						role: "user",
 					};
+
 					setMessages((messages) => [...messages, chatMessage]);
-					// we could broadcast the message here
 
 					socket.send(
 						JSON.stringify({
@@ -111,6 +152,7 @@ function App() {
 					placeholder={`Hello ${name}! Type a message...`}
 					autoComplete="off"
 				/>
+
 				<button type="submit" className="send-message two columns">
 					Send
 				</button>
@@ -119,7 +161,8 @@ function App() {
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+/* ---------------- ROUTER ---------------- */
+
 createRoot(document.getElementById("root")!).render(
 	<BrowserRouter>
 		<Routes>
